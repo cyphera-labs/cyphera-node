@@ -1,0 +1,11 @@
+{
+  "name": "cyphera",
+  "version": "0.1.0",
+  "description": "Data obfuscation SDK — FPE, AES, masking, hashing",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test src/*.test.js"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/cyphera-labs/cyphera-node"
+}
