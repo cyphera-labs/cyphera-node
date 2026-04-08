@@ -11,9 +11,12 @@ npm install cyphera
 ```javascript
 const { Cyphera } = require("cyphera");
 
+// Inline config — or load from cyphera.yaml
 const c = new Cyphera({
   policies: {
     ssn: { engine: "ff1", key_ref: "my-key", tag: "T01" },
+    // cc: { engine: "ff1", key_ref: "my-key", tag: "T02" },
+    // ssn_mask: { engine: "mask", pattern: "last4", tag_enabled: false },
   },
   keys: {
     "my-key": { material: "2B7E151628AED2A6ABF7158809CF4F3C" },
