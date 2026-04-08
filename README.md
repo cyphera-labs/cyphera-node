@@ -64,7 +64,7 @@ Node:        T01i6J-xF-07pX
 
 ## Status
 
-Alpha. API is unstable. Zero runtime dependencies — pure Node.js `crypto` module.
+Alpha. API is unstable. Zero runtime dependencies — pure Node.js `crypto` module. Cross-language test vectors validated against Java and Rust implementations.
 
 ## License
 
