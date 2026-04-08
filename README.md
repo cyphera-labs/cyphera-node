@@ -1,6 +1,12 @@
 # cyphera
 
-Data protection SDK for Node.js — format-preserving encryption (FF1/FF3), AES-GCM, data masking, and hashing. Zero dependencies.
+[![CI](https://github.com/cyphera-labs/cyphera-node/actions/workflows/ci.yml/badge.svg)](https://github.com/cyphera-labs/cyphera-node/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/cyphera)](https://www.npmjs.com/package/cyphera)
+[![npm downloads](https://img.shields.io/npm/dm/cyphera)](https://www.npmjs.com/package/cyphera)
+[![node](https://img.shields.io/node/v/cyphera)](https://www.npmjs.com/package/cyphera)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
+Data protection SDK for Node.js — format-preserving encryption (FF1/FF3), AES-GCM, data masking, and hashing.
 
 ```
 npm install cyphera
@@ -64,7 +70,7 @@ Node:        T01i6J-xF-07pX
 
 ## Status
 
-Alpha. API is unstable. Zero runtime dependencies — pure Node.js `crypto` module. Cross-language test vectors validated against Java and Rust implementations.
+Alpha. API is unstable. Cross-language test vectors validated against Java and Rust implementations.
 
 ## License
 
