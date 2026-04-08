@@ -51,14 +51,13 @@ class FF1 {
     const blocks = Math.ceil(d / 16);
     const out = Buffer.alloc(blocks * 16);
     R.copy(out, 0);
-    let prev = Buffer.from(R);
     for (let j = 1; j < blocks; j++) {
       const x = Buffer.alloc(16);
       x.writeBigUInt64BE(BigInt(j), 8);
-      for (let k = 0; k < 16; k++) x[k] ^= prev[k];
+      // XOR with R (not previous block) per NIST SP 800-38G
+      for (let k = 0; k < 16; k++) x[k] ^= R[k];
       const enc = this._aes(x);
       enc.copy(out, j * 16);
-      prev = enc;
     }
     return out.subarray(0, d);
   }
