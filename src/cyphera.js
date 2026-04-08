@@ -1,5 +1,7 @@
 "use strict";
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const { FF1 } = require("./ff1");
 const { FF3 } = require("./ff3");
 
@@ -248,5 +250,41 @@ class Cyphera {
     return result;
   }
 }
+
+/**
+ * Load from a JSON file path.
+ */
+Cyphera.fromFile = function (filePath) {
+  const contents = fs.readFileSync(filePath, "utf8");
+  const config = JSON.parse(contents);
+  return new Cyphera(config);
+};
+
+/**
+ * Auto-discover policy file using standard precedence:
+ * 1. CYPHERA_POLICY_FILE env var
+ * 2. ./cyphera.json
+ * 3. /etc/cyphera/cyphera.json
+ */
+Cyphera.load = function () {
+  const envPath = process.env.CYPHERA_POLICY_FILE;
+  if (envPath && fs.existsSync(envPath)) {
+    return Cyphera.fromFile(envPath);
+  }
+
+  const localPath = path.resolve("cyphera.json");
+  if (fs.existsSync(localPath)) {
+    return Cyphera.fromFile(localPath);
+  }
+
+  const systemPath = "/etc/cyphera/cyphera.json";
+  if (fs.existsSync(systemPath)) {
+    return Cyphera.fromFile(systemPath);
+  }
+
+  throw new Error(
+    "No policy file found. Checked: CYPHERA_POLICY_FILE env, ./cyphera.json, /etc/cyphera/cyphera.json"
+  );
+};
 
 module.exports = { Cyphera, ALPHABETS };

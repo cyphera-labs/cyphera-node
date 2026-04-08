@@ -11,12 +11,16 @@ npm install cyphera
 ```javascript
 const { Cyphera } = require("cyphera");
 
-// Inline config — or load from cyphera.yaml
+// Auto-discover: checks CYPHERA_POLICY_FILE env, ./cyphera.json, /etc/cyphera/cyphera.json
+const c = Cyphera.load();
+
+// Or load from a specific file
+const c = Cyphera.fromFile("./config/cyphera.json");
+
+// Or inline config
 const c = new Cyphera({
   policies: {
     ssn: { engine: "ff1", key_ref: "my-key", tag: "T01" },
-    // cc: { engine: "ff1", key_ref: "my-key", tag: "T02" },
-    // ssn_mask: { engine: "mask", pattern: "last4", tag_enabled: false },
   },
   keys: {
     "my-key": { material: "2B7E151628AED2A6ABF7158809CF4F3C" },
@@ -32,7 +36,24 @@ const decrypted = c.access(encrypted);
 // → "123-45-6789"
 ```
 
-Cross-language compatible — Java, Rust, and Node produce identical output for the same inputs:
+## Policy File (cyphera.json)
+
+```json
+{
+  "policies": {
+    "ssn": { "engine": "ff1", "key_ref": "my-key", "tag": "T01" },
+    "cc": { "engine": "ff1", "key_ref": "my-key", "tag": "T02" },
+    "ssn_mask": { "engine": "mask", "pattern": "last4", "tag_enabled": false }
+  },
+  "keys": {
+    "my-key": { "material": "2B7E151628AED2A6ABF7158809CF4F3C" }
+  }
+}
+```
+
+## Cross-Language Compatible
+
+Java, Rust, and Node produce identical output for the same inputs:
 
 ```
 Input:       123-45-6789
