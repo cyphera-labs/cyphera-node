@@ -1,7 +1,6 @@
-const { FF1, DIGITS: FF1_DIGITS, ALPHANUMERIC: FF1_ALPHA } = require("./ff1");
-const { FF3, DIGITS: FF3_DIGITS, ALPHANUMERIC: FF3_ALPHA } = require("./ff3");
+"use strict";
+const { FF1 } = require("./ff1");
+const { FF3 } = require("./ff3");
+const { Cyphera, ALPHABETS } = require("./cyphera");
 
-const DIGITS = FF1_DIGITS;
-const ALPHANUMERIC = FF1_ALPHA;
-
-module.exports = { FF1, FF3, DIGITS, ALPHANUMERIC };
+module.exports = { Cyphera, FF1, FF3, ALPHABETS };
