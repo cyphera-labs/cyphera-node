@@ -1,11 +1,37 @@
 {
   "name": "cyphera",
-  "version": "0.1.0",
-  "description": "Data obfuscation SDK — FPE, AES, masking, hashing",
+  "version": "0.0.1-alpha.1",
+  "description": "Data protection SDK — format-preserving encryption (FF1/FF3), AES-GCM, data masking, and hashing. Zero dependencies.",
   "main": "src/index.js",
   "scripts": {
     "test": "node --test src/*.test.js"
   },
+  "keywords": [
+    "encryption",
+    "fpe",
+    "format-preserving-encryption",
+    "data-protection",
+    "masking",
+    "ff1",
+    "ff3",
+    "field-level-encryption"
+  ],
+  "author": "Leslie Gutschow <leslie.gutschow@horizondigital.dev>",
+  "homepage": "https://cyphera.io",
   "license": "Apache-2.0",
-  "repository": "https://github.com/cyphera-labs/cyphera-node"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cyphera-labs/cyphera-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cyphera-labs/cyphera-node/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "src/**/*.js",
+    "LICENSE",
+    "README.md"
+  ]
 }
