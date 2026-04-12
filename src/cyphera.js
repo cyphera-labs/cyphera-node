@@ -18,6 +18,66 @@ function resolveAlphabet(name) {
   return ALPHABETS[name] || name; // literal custom alphabet if not a known name
 }
 
+// Built-in key source resolvers (no keychain dependency needed)
+const BUILTIN_SOURCES = {
+  env(name, config) {
+    const varName = config.var;
+    if (!varName) throw new Error(`Key '${name}': source 'env' requires 'var' field`);
+    const val = process.env[varName];
+    if (!val) throw new Error(`Key '${name}': environment variable '${varName}' is not set`);
+    const encoding = config.encoding || "hex";
+    if (encoding === "base64") return Buffer.from(val, "base64");
+    return Buffer.from(val, "hex");
+  },
+
+  file(name, config) {
+    const filePath = config.path;
+    if (!filePath) throw new Error(`Key '${name}': source 'file' requires 'path' field`);
+    const raw = fs.readFileSync(filePath, "utf8").trim();
+    const encoding = config.encoding || (filePath.endsWith(".b64") || filePath.endsWith(".base64") ? "base64" : "hex");
+    if (encoding === "base64") return Buffer.from(raw, "base64");
+    return Buffer.from(raw, "hex");
+  },
+};
+
+// Cloud sources that require keychain
+const CLOUD_SOURCES = ["aws-kms", "gcp-kms", "azure-kv", "vault"];
+
+let _keychain = null;
+function getKeychain() {
+  if (_keychain === undefined) return null;
+  if (_keychain) return _keychain;
+  try {
+    _keychain = require("@cyphera/keychain");
+  } catch {
+    _keychain = undefined;
+  }
+  return _keychain || null;
+}
+
+function resolveKeySource(name, config) {
+  const source = config.source;
+
+  // Built-in resolvers
+  if (BUILTIN_SOURCES[source]) {
+    return BUILTIN_SOURCES[source](name, config);
+  }
+
+  // Cloud sources — delegate to keychain
+  if (CLOUD_SOURCES.includes(source)) {
+    const keychain = getKeychain();
+    if (!keychain || !keychain.resolve) {
+      throw new Error(
+        `Key '${name}' requires source '${source}' but @cyphera/keychain is not installed.\n` +
+        `Install it: npm install @cyphera/keychain`
+      );
+    }
+    return keychain.resolve(source, config);
+  }
+
+  throw new Error(`Key '${name}': unknown source '${source}'. Valid sources: env, file, ${CLOUD_SOURCES.join(", ")}`);
+}
+
 class Cyphera {
   constructor(config) {
     this._policies = {};
@@ -27,8 +87,18 @@ class Cyphera {
     // Load keys
     const keys = config.keys || {};
     for (const [name, val] of Object.entries(keys)) {
-      const material = typeof val === "string" ? val : val.material;
-      this._keys[name] = Buffer.from(material, "hex");
+      if (typeof val === "string") {
+        // Shorthand: bare hex string
+        this._keys[name] = Buffer.from(val, "hex");
+      } else if (val.material) {
+        // Inline hex material
+        this._keys[name] = Buffer.from(val.material, "hex");
+      } else if (val.source) {
+        // Resolve from source
+        this._keys[name] = resolveKeySource(name, val);
+      } else {
+        throw new Error(`Key '${name}' must have either 'material' or 'source'`);
+      }
     }
 
     // Load policies + build tag index

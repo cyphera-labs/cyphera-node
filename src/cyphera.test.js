@@ -93,4 +93,76 @@ describe("Cyphera SDK", () => {
     const accessed = c.access(protected_);
     assert.strictEqual(accessed, "José123456");
   });
+
+  it("key source: env", () => {
+    process.env.TEST_CYPHERA_KEY = "2B7E151628AED2A6ABF7158809CF4F3C";
+    const c = new Cyphera({
+      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      keys: { k: { source: "env", var: "TEST_CYPHERA_KEY" } },
+    });
+    const p = c.protect("123456789", "ssn");
+    assert.ok(p.startsWith("T01"));
+    assert.strictEqual(c.access(p), "123456789");
+    delete process.env.TEST_CYPHERA_KEY;
+  });
+
+  it("key source: env base64", () => {
+    process.env.TEST_CYPHERA_KEY_B64 = Buffer.from("2B7E151628AED2A6ABF7158809CF4F3C", "hex").toString("base64");
+    const c = new Cyphera({
+      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      keys: { k: { source: "env", var: "TEST_CYPHERA_KEY_B64", encoding: "base64" } },
+    });
+    const p = c.protect("123456789", "ssn");
+    assert.ok(p.startsWith("T01"));
+    assert.strictEqual(c.access(p), "123456789");
+    delete process.env.TEST_CYPHERA_KEY_B64;
+  });
+
+  it("key source: env missing var throws", () => {
+    delete process.env.NONEXISTENT_KEY;
+    assert.throws(() => new Cyphera({
+      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      keys: { k: { source: "env", var: "NONEXISTENT_KEY" } },
+    }), /not set/);
+  });
+
+  it("key source: file", () => {
+    const tmpFile = "/tmp/cyphera-test-key.hex";
+    require("fs").writeFileSync(tmpFile, "2B7E151628AED2A6ABF7158809CF4F3C");
+    const c = new Cyphera({
+      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      keys: { k: { source: "file", path: tmpFile } },
+    });
+    const p = c.protect("123456789", "ssn");
+    assert.ok(p.startsWith("T01"));
+    assert.strictEqual(c.access(p), "123456789");
+    require("fs").unlinkSync(tmpFile);
+  });
+
+  it("key source: unknown cloud source without keychain throws", () => {
+    assert.throws(() => new Cyphera({
+      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      keys: { k: { source: "aws-kms", arn: "arn:aws:kms:us-east-1:123:key/abc" } },
+    }), /cyphera\/keychain/);
+  });
+
+  it("key source: unknown source throws", () => {
+    assert.throws(() => new Cyphera({
+      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      keys: { k: { source: "magic", foo: "bar" } },
+    }), /unknown source/);
+  });
+
+  it("key source: env produces same output as inline material", () => {
+    process.env.TEST_CYPHERA_KEY2 = "2B7E151628AED2A6ABF7158809CF4F3C";
+    const cInline = new Cyphera(config);
+    const cEnv = new Cyphera({
+      policies: config.policies,
+      keys: { "test-key": { source: "env", var: "TEST_CYPHERA_KEY2" } },
+    });
+    const p1 = cInline.protect("123456789", "ssn");
+    const p2 = cEnv.protect("123456789", "ssn");
+    assert.strictEqual(p1, p2, "env source should produce identical output to inline material");
+    delete process.env.TEST_CYPHERA_KEY2;
+  });
 });
