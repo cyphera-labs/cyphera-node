@@ -145,9 +145,9 @@ class Cyphera {
 
   access(protectedValue, policyName) {
     if (policyName) {
-      // Explicit policy
+      // Explicit policy — treat as untagged, no tag stripping
       const policy = this._getPolicy(policyName);
-      return this._accessFpe(protectedValue, policy);
+      return this._accessFpe(protectedValue, policy, true);
     }
 
     // Tag-based lookup — check longest tags first
@@ -155,7 +155,7 @@ class Cyphera {
     for (const tag of tags) {
       if (protectedValue.startsWith(tag)) {
         const policy = this._getPolicy(this._tagIndex[tag]);
-        return this._accessFpe(protectedValue, policy);
+        return this._accessFpe(protectedValue, policy, false);
       }
     }
 
@@ -198,7 +198,7 @@ class Cyphera {
 
   // ── FPE access ──
 
-  _accessFpe(protectedValue, policy) {
+  _accessFpe(protectedValue, policy, explicitPolicy = false) {
     if (!["ff1", "ff3"].includes(policy.engine)) {
       throw new Error(`Cannot reverse '${policy.engine}' — not reversible`);
     }
@@ -206,9 +206,10 @@ class Cyphera {
     const key = this._resolveKey(policy.keyRef);
     const alphabet = policy.alphabet;
 
-    // 1. Strip tag
+    // 1. Strip tag — only for tag-based access (no explicit policy)
+    //    If policy was passed explicitly, treat value as raw untagged ciphertext
     let withoutTag = protectedValue;
-    if (policy.tagEnabled && policy.tag) {
+    if (!explicitPolicy && policy.tagEnabled && policy.tag) {
       withoutTag = protectedValue.slice(policy.tag.length);
     }
 
