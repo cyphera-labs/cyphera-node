@@ -1,6 +1,7 @@
 # cyphera
 
 [![CI](https://github.com/cyphera-labs/cyphera-node/actions/workflows/ci.yml/badge.svg)](https://github.com/cyphera-labs/cyphera-node/actions/workflows/ci.yml)
+[![Security](https://github.com/cyphera-labs/cyphera-node/actions/workflows/codeql.yml/badge.svg)](https://github.com/cyphera-labs/cyphera-node/actions/workflows/codeql.yml)
 [![npm](https://img.shields.io/npm/v/cyphera)](https://www.npmjs.com/package/cyphera)
 [![npm downloads](https://img.shields.io/npm/dm/cyphera)](https://www.npmjs.com/package/cyphera)
 [![node](https://img.shields.io/node/v/cyphera)](https://www.npmjs.com/package/cyphera)
