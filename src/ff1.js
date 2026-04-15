@@ -32,6 +32,8 @@ class FF1 {
   _fromDigits(d) { return d.map(i => this.alphabet[i]).join(""); }
 
   _aes(block) {
+    // NIST SP 800-38G requires AES-ECB as the PRF for FF1/FF3 Feistel rounds.
+    // This is single-block encryption used as a building block, not ECB mode applied to user data.
     const cipher = crypto.createCipheriv(`aes-${this.key.length * 8}-ecb`, this.key, null);
     cipher.setAutoPadding(false);
     return Buffer.concat([cipher.update(block), cipher.final()]);
