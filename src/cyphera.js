@@ -80,8 +80,8 @@ function resolveKeySource(name, config) {
 
 class Cyphera {
   constructor(config) {
-    this._policies = {};
-    this._tagIndex = {};
+    this._configurations = {};
+    this._headerIndex = {};
     this._keys = {};
 
     // Load keys
@@ -101,72 +101,72 @@ class Cyphera {
       }
     }
 
-    // Load policies + build tag index
-    const policies = config.policies || {};
-    for (const [name, pol] of Object.entries(policies)) {
-      const tagEnabled = pol.tag_enabled !== false; // default true
-      const tag = pol.tag || null;
+    // Load configurations + build header index
+    const configurations = config.configurations || {};
+    for (const [name, cfg] of Object.entries(configurations)) {
+      const headerEnabled = cfg.header_enabled !== false; // default true
+      const header = cfg.header || null;
 
-      if (tagEnabled && !tag) {
-        throw new Error(`Policy '${name}' has tag_enabled=true but no tag specified`);
+      if (headerEnabled && !header) {
+        throw new Error(`Configuration '${name}' has header_enabled=true but no header specified`);
       }
 
-      if (tagEnabled && tag) {
-        if (this._tagIndex[tag]) {
-          throw new Error(`Tag collision: '${tag}' used by both '${this._tagIndex[tag]}' and '${name}'`);
+      if (headerEnabled && header) {
+        if (this._headerIndex[header]) {
+          throw new Error(`Header collision: '${header}' used by both '${this._headerIndex[header]}' and '${name}'`);
         }
-        this._tagIndex[tag] = name;
+        this._headerIndex[header] = name;
       }
 
-      this._policies[name] = {
-        engine: pol.engine || "ff1",
-        alphabet: resolveAlphabet(pol.alphabet),
-        keyRef: pol.key_ref || null,
-        tag,
-        tagEnabled,
-        tagLength: pol.tag_length || 3,
-        pattern: pol.pattern || null,
-        algorithm: pol.algorithm || "sha256",
+      this._configurations[name] = {
+        engine: cfg.engine || "ff1",
+        alphabet: resolveAlphabet(cfg.alphabet),
+        keyRef: cfg.key_ref || null,
+        header,
+        headerEnabled,
+        headerLength: cfg.header_length || 3,
+        pattern: cfg.pattern || null,
+        algorithm: cfg.algorithm || "sha256",
       };
     }
   }
 
-  protect(value, policyName) {
-    const policy = this._getPolicy(policyName);
+  protect(value, configurationName) {
+    const configuration = this._getConfiguration(configurationName);
 
-    switch (policy.engine) {
-      case "ff1": return this._protectFpe(value, policy, false);
-      case "ff3": return this._protectFpe(value, policy, true);
-      case "mask": return this._protectMask(value, policy);
-      case "hash": return this._protectHash(value, policy);
-      default: throw new Error(`Unknown engine: ${policy.engine}`);
+    switch (configuration.engine) {
+      case "ff1": return this._protectFpe(value, configuration, false);
+      case "ff3": return this._protectFpe(value, configuration, true);
+      case "mask": return this._protectMask(value, configuration);
+      case "hash": return this._protectHash(value, configuration);
+      default: throw new Error(`Unknown engine: ${configuration.engine}`);
     }
   }
 
-  access(protectedValue, policyName) {
-    if (policyName) {
-      // Explicit policy — treat as untagged, no tag stripping
-      const policy = this._getPolicy(policyName);
-      return this._accessFpe(protectedValue, policy, true);
+  access(protectedValue, configurationName) {
+    if (configurationName) {
+      // Explicit configuration — treat as raw untagged ciphertext, no header stripping
+      const configuration = this._getConfiguration(configurationName);
+      return this._accessFpe(protectedValue, configuration, true);
     }
 
-    // Tag-based lookup — check longest tags first
-    const tags = Object.keys(this._tagIndex).sort((a, b) => b.length - a.length);
-    for (const tag of tags) {
-      if (protectedValue.startsWith(tag)) {
-        const policy = this._getPolicy(this._tagIndex[tag]);
-        return this._accessFpe(protectedValue, policy, false);
+    // Header-based lookup — check longest headers first
+    const headers = Object.keys(this._headerIndex).sort((a, b) => b.length - a.length);
+    for (const header of headers) {
+      if (protectedValue.startsWith(header)) {
+        const configuration = this._getConfiguration(this._headerIndex[header]);
+        return this._accessFpe(protectedValue, configuration, false);
       }
     }
 
-    throw new Error("No matching tag found. Use access(value, policyName) for untagged values.");
+    throw new Error("No matching header found. Use access(value, configurationName) for header-less values.");
   }
 
   // ── FPE protect ──
 
-  _protectFpe(value, policy, isFF3) {
-    const key = this._resolveKey(policy.keyRef);
-    const alphabet = policy.alphabet;
+  _protectFpe(value, configuration, isFF3) {
+    const key = this._resolveKey(configuration.keyRef);
+    const alphabet = configuration.alphabet;
 
     // 1. Strip passthroughs
     const { encryptable, positions, chars } = this._extractPassthroughs(value, alphabet);
@@ -189,36 +189,36 @@ class Cyphera {
     // 4. Reinsert passthroughs
     const withPt = this._reinsertPassthroughs(encrypted, positions, chars);
 
-    // 5. Prepend tag
-    if (policy.tagEnabled && policy.tag) {
-      return policy.tag + withPt;
+    // 5. Prepend header
+    if (configuration.headerEnabled && configuration.header) {
+      return configuration.header + withPt;
     }
     return withPt;
   }
 
   // ── FPE access ──
 
-  _accessFpe(protectedValue, policy, explicitPolicy = false) {
-    if (!["ff1", "ff3"].includes(policy.engine)) {
-      throw new Error(`Cannot reverse '${policy.engine}' — not reversible`);
+  _accessFpe(protectedValue, configuration, explicitConfiguration = false) {
+    if (!["ff1", "ff3"].includes(configuration.engine)) {
+      throw new Error(`Cannot reverse '${configuration.engine}' — not reversible`);
     }
 
-    const key = this._resolveKey(policy.keyRef);
-    const alphabet = policy.alphabet;
+    const key = this._resolveKey(configuration.keyRef);
+    const alphabet = configuration.alphabet;
 
-    // 1. Strip tag — only for tag-based access (no explicit policy)
-    //    If policy was passed explicitly, treat value as raw untagged ciphertext
-    let withoutTag = protectedValue;
-    if (!explicitPolicy && policy.tagEnabled && policy.tag) {
-      withoutTag = protectedValue.slice(policy.tag.length);
+    // 1. Strip header — only for header-based access (no explicit configuration)
+    //    If configuration was passed explicitly, treat value as raw header-less ciphertext
+    let withoutHeader = protectedValue;
+    if (!explicitConfiguration && configuration.headerEnabled && configuration.header) {
+      withoutHeader = protectedValue.slice(configuration.header.length);
     }
 
     // 2. Strip passthroughs
-    const { encryptable, positions, chars } = this._extractPassthroughs(withoutTag, alphabet);
+    const { encryptable, positions, chars } = this._extractPassthroughs(withoutHeader, alphabet);
 
     // 3. Decrypt
     let decrypted;
-    if (policy.engine === "ff3") {
+    if (configuration.engine === "ff3") {
       const cipher = new FF3(key, Buffer.alloc(8), alphabet);
       decrypted = cipher.decrypt(encryptable);
     } else {
@@ -232,12 +232,12 @@ class Cyphera {
 
   // ── Mask ──
 
-  _protectMask(value, policy) {
-    if (!policy.pattern) throw new Error("Mask policy requires 'pattern'");
+  _protectMask(value, configuration) {
+    if (!configuration.pattern) throw new Error("Mask configuration requires 'pattern'");
     const len = value.length;
     const mask = "*";
 
-    switch (policy.pattern) {
+    switch (configuration.pattern) {
       case "last4": case "last_4":
         return mask.repeat(Math.max(0, len - 4)) + value.slice(-4);
       case "last2": case "last_2":
@@ -254,18 +254,18 @@ class Cyphera {
 
   // ── Hash ──
 
-  _protectHash(value, policy) {
-    const algo = policy.algorithm.replace("-", "").toLowerCase();
+  _protectHash(value, configuration) {
+    const algo = configuration.algorithm.replace("-", "").toLowerCase();
     let javaAlgo;
     switch (algo) {
       case "sha256": javaAlgo = "sha256"; break;
       case "sha384": javaAlgo = "sha384"; break;
       case "sha512": javaAlgo = "sha512"; break;
-      default: throw new Error(`Unsupported hash algorithm: ${policy.algorithm}`);
+      default: throw new Error(`Unsupported hash algorithm: ${configuration.algorithm}`);
     }
 
-    if (policy.keyRef) {
-      const key = this._resolveKey(policy.keyRef);
+    if (configuration.keyRef) {
+      const key = this._resolveKey(configuration.keyRef);
       const hmac = crypto.createHmac(javaAlgo, key);
       hmac.update(value, "utf8");
       return hmac.digest("hex");
@@ -278,14 +278,14 @@ class Cyphera {
 
   // ── Helpers ──
 
-  _getPolicy(name) {
-    const p = this._policies[name];
-    if (!p) throw new Error(`Unknown policy: ${name}`);
-    return p;
+  _getConfiguration(name) {
+    const c = this._configurations[name];
+    if (!c) throw new Error(`configuration not found: ${name}`);
+    return c;
   }
 
   _resolveKey(keyRef) {
-    if (!keyRef) throw new Error("No key_ref in policy");
+    if (!keyRef) throw new Error("No key_ref in configuration");
     const key = this._keys[keyRef];
     if (!key) throw new Error(`Unknown key: ${keyRef}`);
     return key;
@@ -332,13 +332,13 @@ Cyphera.fromFile = function (filePath) {
 };
 
 /**
- * Auto-discover policy file using standard precedence:
- * 1. CYPHERA_POLICY_FILE env var
+ * Auto-discover configuration file using standard precedence:
+ * 1. CYPHERA_CONFIG_FILE env var
  * 2. ./cyphera.json
  * 3. /etc/cyphera/cyphera.json
  */
 Cyphera.load = function () {
-  const envPath = process.env.CYPHERA_POLICY_FILE;
+  const envPath = process.env.CYPHERA_CONFIG_FILE;
   if (envPath && fs.existsSync(envPath)) {
     return Cyphera.fromFile(envPath);
   }
@@ -354,7 +354,7 @@ Cyphera.load = function () {
   }
 
   throw new Error(
-    "No policy file found. Checked: CYPHERA_POLICY_FILE env, ./cyphera.json, /etc/cyphera/cyphera.json"
+    "No configuration file found. Checked: CYPHERA_CONFIG_FILE env, ./cyphera.json, /etc/cyphera/cyphera.json"
   );
 };
 

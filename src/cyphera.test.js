@@ -4,11 +4,11 @@ const assert = require("node:assert");
 const { Cyphera } = require("./cyphera");
 
 const config = {
-  policies: {
-    ssn: { engine: "ff1", key_ref: "test-key", tag: "T01" },
-    ssn_digits: { engine: "ff1", alphabet: "digits", tag_enabled: false, key_ref: "test-key" },
-    ssn_mask: { engine: "mask", pattern: "last4", tag_enabled: false },
-    ssn_hash: { engine: "hash", algorithm: "sha256", key_ref: "test-key", tag_enabled: false },
+  configurations: {
+    ssn: { engine: "ff1", key_ref: "test-key", header: "T01" },
+    ssn_digits: { engine: "ff1", alphabet: "digits", header_enabled: false, key_ref: "test-key" },
+    ssn_mask: { engine: "mask", pattern: "last4", header_enabled: false },
+    ssn_hash: { engine: "hash", algorithm: "sha256", key_ref: "test-key", header_enabled: false },
   },
   keys: {
     "test-key": { material: "2B7E151628AED2A6ABF7158809CF4F3C" },
@@ -16,7 +16,7 @@ const config = {
 };
 
 describe("Cyphera SDK", () => {
-  it("protect and access with tag", () => {
+  it("protect and access with header", () => {
     const c = new Cyphera(config);
     const protected_ = c.protect("123456789", "ssn");
     assert.ok(protected_.startsWith("T01"));
@@ -33,7 +33,7 @@ describe("Cyphera SDK", () => {
     assert.strictEqual(accessed, "123-45-6789");
   });
 
-  it("untagged digits roundtrip", () => {
+  it("header-less digits roundtrip", () => {
     const c = new Cyphera(config);
     const protected_ = c.protect("123456789", "ssn_digits");
     assert.strictEqual(protected_.length, 9);
@@ -65,26 +65,26 @@ describe("Cyphera SDK", () => {
   it("access non-reversible throws", () => {
     const c = new Cyphera(config);
     const masked = c.protect("123-45-6789", "ssn_mask");
-    assert.throws(() => c.access(masked), /No matching tag/);
+    assert.throws(() => c.access(masked), /No matching header/);
   });
 
-  it("tag collision throws", () => {
+  it("header collision throws", () => {
     assert.throws(() => new Cyphera({
-      policies: {
-        a: { engine: "ff1", key_ref: "k", tag: "ABC" },
-        b: { engine: "ff1", key_ref: "k", tag: "ABC" },
+      configurations: {
+        a: { engine: "ff1", key_ref: "k", header: "ABC" },
+        b: { engine: "ff1", key_ref: "k", header: "ABC" },
       },
       keys: { k: { material: "2B7E151628AED2A6ABF7158809CF4F3C" } },
-    }), /Tag collision/);
+    }), /Header collision/);
   });
 
-  it("tag required when enabled throws", () => {
+  it("header required when enabled throws", () => {
     assert.throws(() => new Cyphera({
-      policies: {
+      configurations: {
         a: { engine: "ff1", key_ref: "k" },
       },
       keys: { k: { material: "2B7E151628AED2A6ABF7158809CF4F3C" } },
-    }), /no tag specified/);
+    }), /no header specified/);
   });
 
   it("unicode passthroughs roundtrip", () => {
@@ -97,7 +97,7 @@ describe("Cyphera SDK", () => {
   it("key source: env", () => {
     process.env.TEST_CYPHERA_KEY = "2B7E151628AED2A6ABF7158809CF4F3C";
     const c = new Cyphera({
-      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      configurations: { ssn: { engine: "ff1", key_ref: "k", header: "T01" } },
       keys: { k: { source: "env", var: "TEST_CYPHERA_KEY" } },
     });
     const p = c.protect("123456789", "ssn");
@@ -109,7 +109,7 @@ describe("Cyphera SDK", () => {
   it("key source: env base64", () => {
     process.env.TEST_CYPHERA_KEY_B64 = Buffer.from("2B7E151628AED2A6ABF7158809CF4F3C", "hex").toString("base64");
     const c = new Cyphera({
-      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      configurations: { ssn: { engine: "ff1", key_ref: "k", header: "T01" } },
       keys: { k: { source: "env", var: "TEST_CYPHERA_KEY_B64", encoding: "base64" } },
     });
     const p = c.protect("123456789", "ssn");
@@ -121,7 +121,7 @@ describe("Cyphera SDK", () => {
   it("key source: env missing var throws", () => {
     delete process.env.NONEXISTENT_KEY;
     assert.throws(() => new Cyphera({
-      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      configurations: { ssn: { engine: "ff1", key_ref: "k", header: "T01" } },
       keys: { k: { source: "env", var: "NONEXISTENT_KEY" } },
     }), /not set/);
   });
@@ -130,7 +130,7 @@ describe("Cyphera SDK", () => {
     const tmpFile = "/tmp/cyphera-test-key.hex";
     require("fs").writeFileSync(tmpFile, "2B7E151628AED2A6ABF7158809CF4F3C");
     const c = new Cyphera({
-      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      configurations: { ssn: { engine: "ff1", key_ref: "k", header: "T01" } },
       keys: { k: { source: "file", path: tmpFile } },
     });
     const p = c.protect("123456789", "ssn");
@@ -141,14 +141,14 @@ describe("Cyphera SDK", () => {
 
   it("key source: unknown cloud source without keychain throws", () => {
     assert.throws(() => new Cyphera({
-      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      configurations: { ssn: { engine: "ff1", key_ref: "k", header: "T01" } },
       keys: { k: { source: "aws-kms", arn: "arn:aws:kms:us-east-1:123:key/abc" } },
     }), /cyphera\/keychain/);
   });
 
   it("key source: unknown source throws", () => {
     assert.throws(() => new Cyphera({
-      policies: { ssn: { engine: "ff1", key_ref: "k", tag: "T01" } },
+      configurations: { ssn: { engine: "ff1", key_ref: "k", header: "T01" } },
       keys: { k: { source: "magic", foo: "bar" } },
     }), /unknown source/);
   });
@@ -157,7 +157,7 @@ describe("Cyphera SDK", () => {
     process.env.TEST_CYPHERA_KEY2 = "2B7E151628AED2A6ABF7158809CF4F3C";
     const cInline = new Cyphera(config);
     const cEnv = new Cyphera({
-      policies: config.policies,
+      configurations: config.configurations,
       keys: { "test-key": { source: "env", var: "TEST_CYPHERA_KEY2" } },
     });
     const p1 = cInline.protect("123456789", "ssn");
