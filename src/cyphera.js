@@ -145,9 +145,19 @@ class Cyphera {
 
   access(protectedValue, configurationName) {
     if (configurationName) {
-      // Explicit configuration — treat as raw untagged ciphertext, no header stripping
+      // Explicit configuration — only valid for header_enabled=false configs.
+      // Treats the input as raw headerless ciphertext. For headered configs the
+      // header itself identifies the configuration, so the single-arg form is
+      // the right call.
       const configuration = this._getConfiguration(configurationName);
-      return this._accessFpe(protectedValue, configuration, true);
+      if (configuration.headerEnabled) {
+        throw new Error(
+          "configuration '" + configurationName + "' has header_enabled=true; " +
+          "use access(value) — the header identifies the configuration. " +
+          "The two-arg form is for header_enabled=false configurations only."
+        );
+      }
+      return this._accessFpe(protectedValue, configuration);
     }
 
     // Header-based lookup — check longest headers first
@@ -155,7 +165,8 @@ class Cyphera {
     for (const header of headers) {
       if (protectedValue.startsWith(header)) {
         const configuration = this._getConfiguration(this._headerIndex[header]);
-        return this._accessFpe(protectedValue, configuration, false);
+        const stripped = protectedValue.slice(header.length);
+        return this._accessFpe(stripped, configuration);
       }
     }
 
@@ -198,7 +209,10 @@ class Cyphera {
 
   // ── FPE access ──
 
-  _accessFpe(protectedValue, configuration, explicitConfiguration = false) {
+  // Internal: decrypt assuming `protectedValue` is already header-stripped.
+  // Used by both access paths — the header strip happens exactly once in the
+  // caller (header-based path) or never (explicit path is header_enabled=false).
+  _accessFpe(protectedValue, configuration) {
     if (!["ff1", "ff3"].includes(configuration.engine)) {
       throw new Error(`Cannot reverse '${configuration.engine}' — not reversible`);
     }
@@ -206,17 +220,10 @@ class Cyphera {
     const key = this._resolveKey(configuration.keyRef);
     const alphabet = configuration.alphabet;
 
-    // 1. Strip header — only for header-based access (no explicit configuration)
-    //    If configuration was passed explicitly, treat value as raw header-less ciphertext
-    let withoutHeader = protectedValue;
-    if (!explicitConfiguration && configuration.headerEnabled && configuration.header) {
-      withoutHeader = protectedValue.slice(configuration.header.length);
-    }
+    // 1. Strip passthroughs
+    const { encryptable, positions, chars } = this._extractPassthroughs(protectedValue, alphabet);
 
-    // 2. Strip passthroughs
-    const { encryptable, positions, chars } = this._extractPassthroughs(withoutHeader, alphabet);
-
-    // 3. Decrypt
+    // 2. Decrypt
     let decrypted;
     if (configuration.engine === "ff3") {
       const cipher = new FF3(key, Buffer.alloc(8), alphabet);
@@ -226,7 +233,7 @@ class Cyphera {
       decrypted = cipher.decrypt(encryptable);
     }
 
-    // 4. Reinsert passthroughs
+    // 3. Reinsert passthroughs
     return this._reinsertPassthroughs(decrypted, positions, chars);
   }
 

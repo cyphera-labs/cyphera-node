@@ -68,6 +68,12 @@ describe("Cyphera SDK", () => {
     assert.throws(() => c.access(masked), /No matching header/);
   });
 
+  it("two-arg access on header_enabled=true configuration throws", () => {
+    const c = new Cyphera(config);
+    const p = c.protect("123-45-6789", "ssn");
+    assert.throws(() => c.access(p, "ssn"), /header_enabled=true/);
+  });
+
   it("header collision throws", () => {
     assert.throws(() => new Cyphera({
       configurations: {
