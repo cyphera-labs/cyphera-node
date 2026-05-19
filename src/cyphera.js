@@ -144,22 +144,24 @@ class Cyphera {
   }
 
   access(protectedValue, configurationName) {
-    if (configurationName) {
-      // Explicit configuration — only valid for header_enabled=false configs.
-      // Treats the input as raw headerless ciphertext. For headered configs the
-      // header itself identifies the configuration, so the single-arg form is
-      // the right call.
-      const configuration = this._getConfiguration(configurationName);
-      if (configuration.headerEnabled) {
-        throw new Error(
-          "configuration '" + configurationName + "' has header_enabled=true; " +
-          "use access(value) — the header identifies the configuration. " +
-          "The two-arg form is for header_enabled=false configurations only."
-        );
-      }
-      return this._accessFpe(protectedValue, configuration);
+    // Explicit configuration — only valid for header_enabled=false configs.
+    // Treats the input as raw headerless ciphertext. For headered configs use
+    // accessByHeader() — the header identifies the configuration.
+    if (configurationName === undefined || configurationName === null) {
+      throw new Error("access(value, configurationName) requires a configuration name. Use accessByHeader(value) for header-based access.");
     }
+    const configuration = this._getConfiguration(configurationName);
+    if (configuration.headerEnabled) {
+      throw new Error(
+        "configuration '" + configurationName + "' has header_enabled=true; " +
+        "use accessByHeader(value) — the header identifies the configuration. " +
+        "The two-arg form is for header_enabled=false configurations only."
+      );
+    }
+    return this._accessFpe(protectedValue, configuration);
+  }
 
+  accessByHeader(protectedValue) {
     // Header-based lookup — check longest headers first
     const headers = Object.keys(this._headerIndex).sort((a, b) => b.length - a.length);
     for (const header of headers) {

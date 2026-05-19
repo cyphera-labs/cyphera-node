@@ -21,7 +21,7 @@ describe("Cyphera SDK", () => {
     const protected_ = c.protect("123456789", "ssn");
     assert.ok(protected_.startsWith("T01"));
     assert.ok(protected_.length > "123456789".length);
-    const accessed = c.access(protected_);
+    const accessed = c.accessByHeader(protected_);
     assert.strictEqual(accessed, "123456789");
   });
 
@@ -29,7 +29,7 @@ describe("Cyphera SDK", () => {
     const c = new Cyphera(config);
     const protected_ = c.protect("123-45-6789", "ssn");
     assert.ok(protected_.includes("-"));
-    const accessed = c.access(protected_);
+    const accessed = c.accessByHeader(protected_);
     assert.strictEqual(accessed, "123-45-6789");
   });
 
@@ -65,7 +65,7 @@ describe("Cyphera SDK", () => {
   it("access non-reversible throws", () => {
     const c = new Cyphera(config);
     const masked = c.protect("123-45-6789", "ssn_mask");
-    assert.throws(() => c.access(masked), /No matching header/);
+    assert.throws(() => c.accessByHeader(masked), /No matching header/);
   });
 
   it("two-arg access on header_enabled=true configuration throws", () => {
@@ -96,7 +96,7 @@ describe("Cyphera SDK", () => {
   it("unicode passthroughs roundtrip", () => {
     const c = new Cyphera(config);
     const protected_ = c.protect("José123456", "ssn");
-    const accessed = c.access(protected_);
+    const accessed = c.accessByHeader(protected_);
     assert.strictEqual(accessed, "José123456");
   });
 
@@ -108,7 +108,7 @@ describe("Cyphera SDK", () => {
     });
     const p = c.protect("123456789", "ssn");
     assert.ok(p.startsWith("T01"));
-    assert.strictEqual(c.access(p), "123456789");
+    assert.strictEqual(c.accessByHeader(p), "123456789");
     delete process.env.TEST_CYPHERA_KEY;
   });
 
@@ -120,7 +120,7 @@ describe("Cyphera SDK", () => {
     });
     const p = c.protect("123456789", "ssn");
     assert.ok(p.startsWith("T01"));
-    assert.strictEqual(c.access(p), "123456789");
+    assert.strictEqual(c.accessByHeader(p), "123456789");
     delete process.env.TEST_CYPHERA_KEY_B64;
   });
 
@@ -141,7 +141,7 @@ describe("Cyphera SDK", () => {
     });
     const p = c.protect("123456789", "ssn");
     assert.ok(p.startsWith("T01"));
-    assert.strictEqual(c.access(p), "123456789");
+    assert.strictEqual(c.accessByHeader(p), "123456789");
     require("fs").unlinkSync(tmpFile);
   });
 
