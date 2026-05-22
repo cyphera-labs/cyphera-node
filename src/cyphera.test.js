@@ -37,7 +37,7 @@ describe("Cyphera SDK", () => {
     const c = new Cyphera(config);
     const protected_ = c.protect("123456789", "ssn_digits");
     assert.strictEqual(protected_.length, 9);
-    const accessed = c.decrypt("ssn_digits", protected_);
+    const accessed = c.access(protected_, "ssn_digits");
     assert.strictEqual(accessed, "123456789");
   });
 
@@ -68,12 +68,15 @@ describe("Cyphera SDK", () => {
     assert.throws(() => c.access(masked), /No matching header/);
   });
 
-  it("decrypt on header_enabled=true configuration throws", () => {
+  it("access with config: unknown configuration throws", () => {
     const c = new Cyphera(config);
-    const p = c.protect("123-45-6789", "ssn");
-    // ssn is headered, so decrypt — the lower-level headerless drop-down —
-    // must error cleanly. Headered configs go through access(value).
-    assert.throws(() => c.decrypt("ssn", p), /header_enabled=true/);
+    assert.throws(() => c.access("abc", "nope"));
+  });
+
+  it("access with config: irreversible engine throws", () => {
+    const c = new Cyphera(config);
+    // Escape hatch rejects irreversible engines (mask/hash).
+    assert.throws(() => c.access("anything", "ssn_mask"), /Cannot reverse/);
   });
 
   it("header collision throws", () => {
