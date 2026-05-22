@@ -126,4 +126,32 @@ class FF3 {
   }
 }
 
-module.exports = { FF3, DIGITS, ALPHANUMERIC };
+// expandFF31Tweak expands the 56-bit FF3-1 tweak into the 64-bit tweak the
+// FF3 round function consumes (NIST SP 800-38G Rev 1): bytes[0:4] = T_L,
+// bytes[4:8] = T_R.
+function expandFF31Tweak(t) {
+  return Buffer.from([
+    t[0], t[1], t[2], t[3] & 0xf0,
+    t[4], t[5], t[6], (t[3] & 0x0f) << 4,
+  ]);
+}
+
+/**
+ * FF3-1 Format-Preserving Encryption (NIST SP 800-38G Rev 1).
+ *
+ * FF3-1 is FF3 with a 56-bit (7-byte) tweak. The tweak is expanded into the
+ * 64-bit form the FF3 round function consumes; the algorithm is identical FF3.
+ */
+class FF31 {
+  constructor(key, tweak, alphabet = ALPHANUMERIC) {
+    if (tweak.length !== 7) {
+      throw new Error("FF3-1 tweak must be exactly 7 bytes (56 bits)");
+    }
+    this._ff3 = new FF3(key, expandFF31Tweak(tweak), alphabet);
+  }
+
+  encrypt(plaintext) { return this._ff3.encrypt(plaintext); }
+  decrypt(ciphertext) { return this._ff3.decrypt(ciphertext); }
+}
+
+module.exports = { FF3, FF31, DIGITS, ALPHANUMERIC };

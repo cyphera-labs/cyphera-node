@@ -3,7 +3,19 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { FF1 } = require("./ff1");
-const { FF3 } = require("./ff3");
+const { FF3, FF31 } = require("./ff3");
+
+let _ff3Warned = false;
+// warnFF3Deprecated emits the FF3 deprecation warning to stderr, once per
+// process. Original FF3 is cryptographically weak; use the 'ff31' engine.
+function warnFF3Deprecated() {
+  if (!_ff3Warned) {
+    _ff3Warned = true;
+    process.stderr.write(
+      "WARNING: engine 'ff3' is deprecated and cryptographically weak — migrate to 'ff31' (FF3-1).\n"
+    );
+  }
+}
 
 const ALPHABETS = {
   digits: "0123456789",
@@ -135,8 +147,9 @@ class Cyphera {
     const configuration = this._getConfiguration(configurationName);
 
     switch (configuration.engine) {
-      case "ff1": return this._protectFpe(value, configuration, false);
-      case "ff3": return this._protectFpe(value, configuration, true);
+      case "ff1":
+      case "ff3":
+      case "ff31": return this._protectFpe(value, configuration);
       case "mask": return this._protectMask(value, configuration);
       case "hash": return this._protectHash(value, configuration);
       default: throw new Error(`Unknown engine: ${configuration.engine}`);
@@ -177,7 +190,7 @@ class Cyphera {
 
   // ── FPE protect ──
 
-  _protectFpe(value, configuration, isFF3) {
+  _protectFpe(value, configuration) {
     const key = this._resolveKey(configuration.keyRef);
     const alphabet = configuration.alphabet;
 
@@ -191,8 +204,12 @@ class Cyphera {
 
     // 3. Encrypt
     let encrypted;
-    if (isFF3) {
+    if (configuration.engine === "ff3") {
+      warnFF3Deprecated();
       const cipher = new FF3(key, Buffer.alloc(8), alphabet);
+      encrypted = cipher.encrypt(encryptable);
+    } else if (configuration.engine === "ff31") {
+      const cipher = new FF31(key, Buffer.alloc(7), alphabet);
       encrypted = cipher.encrypt(encryptable);
     } else {
       const cipher = new FF1(key, Buffer.alloc(0), alphabet);
@@ -215,7 +232,7 @@ class Cyphera {
   // Used by both access paths — the header strip happens exactly once in the
   // caller (header-based path) or never (explicit path is header_enabled=false).
   _accessFpe(protectedValue, configuration) {
-    if (!["ff1", "ff3"].includes(configuration.engine)) {
+    if (!["ff1", "ff3", "ff31"].includes(configuration.engine)) {
       throw new Error(`Cannot reverse '${configuration.engine}' — not reversible`);
     }
 
@@ -228,7 +245,11 @@ class Cyphera {
     // 2. Decrypt
     let decrypted;
     if (configuration.engine === "ff3") {
+      warnFF3Deprecated();
       const cipher = new FF3(key, Buffer.alloc(8), alphabet);
+      decrypted = cipher.decrypt(encryptable);
+    } else if (configuration.engine === "ff31") {
+      const cipher = new FF31(key, Buffer.alloc(7), alphabet);
       decrypted = cipher.decrypt(encryptable);
     } else {
       const cipher = new FF1(key, Buffer.alloc(0), alphabet);
