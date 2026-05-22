@@ -156,26 +156,13 @@ class Cyphera {
     }
   }
 
-  access(protectedValue, configurationName) {
-    // Explicit configuration — only valid for header_enabled=false configs.
-    // Treats the input as raw headerless ciphertext. For headered configs use
-    // accessByHeader() — the header identifies the configuration.
-    if (configurationName === undefined || configurationName === null) {
-      throw new Error("access(value, configurationName) requires a configuration name. Use accessByHeader(value) for header-based access.");
-    }
-    const configuration = this._getConfiguration(configurationName);
-    if (configuration.headerEnabled) {
-      throw new Error(
-        "configuration '" + configurationName + "' has header_enabled=true; " +
-        "use accessByHeader(value) — the header identifies the configuration. " +
-        "The two-arg form is for header_enabled=false configurations only."
-      );
-    }
-    return this._accessFpe(protectedValue, configuration);
-  }
-
-  accessByHeader(protectedValue) {
-    // Header-based lookup — check longest headers first
+  access(protectedValue) {
+    // Reverse a protected value. The SDK uses the loaded configurations
+    // to figure out which one applies — it checks the leading bytes of
+    // protectedValue against the registered headers (longest first to
+    // avoid prefix collisions), strips the matched header, and decrypts.
+    //
+    // For configurations without a header, drop down to decrypt(name, ct).
     const headers = Object.keys(this._headerIndex).sort((a, b) => b.length - a.length);
     for (const header of headers) {
       if (protectedValue.startsWith(header)) {
@@ -185,7 +172,23 @@ class Cyphera {
       }
     }
 
-    throw new Error("No matching header found. Use access(value, configurationName) for header-less values.");
+    throw new Error("No matching header found. Use decrypt(configurationName, ciphertext) for header-less values.");
+  }
+
+  decrypt(configurationName, ciphertext) {
+    // Lower-level drop-down for reversing a headerless ciphertext using
+    // a named configuration. The configuration must have
+    // header_enabled=false — for headered configurations, use access(value),
+    // which strips the header itself.
+    const configuration = this._getConfiguration(configurationName);
+    if (configuration.headerEnabled) {
+      throw new Error(
+        "configuration '" + configurationName + "' has header_enabled=true; " +
+        "use access(value) — the header identifies the configuration. " +
+        "decrypt is for header_enabled=false configurations only."
+      );
+    }
+    return this._accessFpe(ciphertext, configuration);
   }
 
   // ── FPE protect ──
@@ -229,8 +232,9 @@ class Cyphera {
   // ── FPE access ──
 
   // Internal: decrypt assuming `protectedValue` is already header-stripped.
-  // Used by both access paths — the header strip happens exactly once in the
-  // caller (header-based path) or never (explicit path is header_enabled=false).
+  // Used by access() (which strips the header itself) and by decrypt()
+  // (only valid for header_enabled=false configurations, which have no
+  // header to strip).
   _accessFpe(protectedValue, configuration) {
     if (!["ff1", "ff3", "ff31"].includes(configuration.engine)) {
       throw new Error(`Cannot reverse '${configuration.engine}' — not reversible`);
