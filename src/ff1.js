@@ -107,8 +107,16 @@ class FF1 {
     return Buffer.from(hex.slice(-b * 2), "hex");
   }
 
+  // NIST SP 800-38G: length >= 2 and radix^length >= 1,000,000.
+  _checkLength(n) {
+    if (n < 2 || this.radix ** BigInt(n) < 1000000n) {
+      throw new Error("input too short (NIST minimum: length >= 2 and radix^length >= 1,000,000)");
+    }
+  }
+
   _ff1Encrypt(pt, T) {
     const n = pt.length, u = Math.floor(n / 2), v = n - u;
+    this._checkLength(n);
     let A = pt.slice(0, u), B = pt.slice(u);
     const b = this._computeB(v);
     const d = 4 * Math.ceil(b / 4) + 4;
@@ -129,6 +137,7 @@ class FF1 {
 
   _ff1Decrypt(ct, T) {
     const n = ct.length, u = Math.floor(n / 2), v = n - u;
+    this._checkLength(n);
     let A = ct.slice(0, u), B = ct.slice(u);
     const b = this._computeB(v);
     const d = 4 * Math.ceil(b / 4) + 4;

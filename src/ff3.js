@@ -16,15 +16,32 @@ class FF3 {
     this.radix = BigInt(alphabet.length);
     this.charMap = {};
     for (let i = 0; i < alphabet.length; i++) this.charMap[alphabet[i]] = i;
+    // NIST FF3 maximum length: 2 * floor(log_radix(2^96)), exact arithmetic.
+    const limit = 1n << 96n;
+    let k = 0n;
+    while (this.radix ** (k + 1n) <= limit) k++;
+    this.maxLen = 2 * Number(k);
+  }
+
+  // NIST SP 800-38G: length >= 2, radix^length >= 1,000,000, length <= maxLen.
+  _checkLength(n) {
+    if (n < 2 || this.radix ** BigInt(n) < 1000000n) {
+      throw new Error("input too short (NIST minimum: length >= 2 and radix^length >= 1,000,000)");
+    }
+    if (n > this.maxLen) {
+      throw new Error(`input too long (FF3 maximum for this radix is ${this.maxLen})`);
+    }
   }
 
   encrypt(plaintext) {
     const digits = this._toDigits(plaintext);
+    this._checkLength(digits.length);
     return this._fromDigits(this._ff3Encrypt(digits));
   }
 
   decrypt(ciphertext) {
     const digits = this._toDigits(ciphertext);
+    this._checkLength(digits.length);
     return this._fromDigits(this._ff3Decrypt(digits));
   }
 
