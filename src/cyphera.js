@@ -134,6 +134,7 @@ class Cyphera {
         engine: cfg.engine || "ff1",
         alphabet: resolveAlphabet(cfg.alphabet),
         keyRef: cfg.key_ref || null,
+        tweak: cfg.tweak || null,
         header,
         headerEnabled,
         headerLength: cfg.header_length || 3,
@@ -149,7 +150,7 @@ class Cyphera {
     switch (configuration.engine) {
       case "ff1":
       case "ff3":
-      case "ff31": return this._protectFpe(value, configuration);
+      case "ff31": return this._protectFpe(value, configurationName, configuration);
       case "mask": return this._protectMask(value, configuration);
       case "hash": return this._protectHash(value, configuration);
       default: throw new Error(`unknown engine: ${configuration.engine}`);
@@ -180,16 +181,17 @@ class Cyphera {
       if (configuration.engine === "hash") {
         throw new Error(`cannot reverse '${configurationName}' — hash is irreversible`);
       }
-      return this._accessFpe(value, configuration);
+      return this._accessFpe(value, configurationName, configuration);
     }
 
     // Primary form — header-based lookup, longest headers first.
     const headers = Object.keys(this._headerIndex).sort((a, b) => b.length - a.length);
     for (const header of headers) {
       if (value.startsWith(header)) {
-        const configuration = this._getConfiguration(this._headerIndex[header]);
+        const name = this._headerIndex[header];
+        const configuration = this._getConfiguration(name);
         const stripped = value.slice(header.length);
-        return this._accessFpe(stripped, configuration);
+        return this._accessFpe(stripped, name, configuration);
       }
     }
 
@@ -198,7 +200,35 @@ class Cyphera {
 
   // ── FPE protect ──
 
-  _protectFpe(value, configuration) {
+  // Resolve + validate the configuration-level tweak. FF3 requires exactly
+  // 8 bytes and FF3-1 requires exactly 7; a missing tweak for either is a
+  // hard error with the canonical spec message (no silent zero-fill — see
+  // cyphera-spec/spec/sdk.md). FF1 accepts an empty or arbitrary-length
+  // tweak per NIST SP 800-38G.
+  _resolveTweak(name, configuration) {
+    const tweakHex = configuration.tweak;
+    if (configuration.engine === "ff3") {
+      if (!tweakHex) {
+        throw new Error(
+          `configuration '${name}' is missing required 'tweak' (FF3 needs 8 bytes)`
+        );
+      }
+      return Buffer.from(tweakHex, "hex");
+    }
+    if (configuration.engine === "ff31") {
+      if (!tweakHex) {
+        throw new Error(
+          `configuration '${name}' is missing required 'tweak' (FF3-1 needs 7 bytes)`
+        );
+      }
+      return Buffer.from(tweakHex, "hex");
+    }
+    // FF1 — optional, default empty.
+    if (!tweakHex) return Buffer.alloc(0);
+    return Buffer.from(tweakHex, "hex");
+  }
+
+  _protectFpe(value, name, configuration) {
     const key = this._resolveKey(configuration.keyRef);
     const alphabet = configuration.alphabet;
 
@@ -210,17 +240,19 @@ class Cyphera {
       throw new Error("no encryptable characters in input");
     }
 
+    const tweak = this._resolveTweak(name, configuration);
+
     // 3. Encrypt
     let encrypted;
     if (configuration.engine === "ff3") {
       warnFF3Deprecated();
-      const cipher = new FF3(key, Buffer.alloc(8), alphabet);
+      const cipher = new FF3(key, tweak, alphabet);
       encrypted = cipher.encrypt(encryptable);
     } else if (configuration.engine === "ff31") {
-      const cipher = new FF31(key, Buffer.alloc(7), alphabet);
+      const cipher = new FF31(key, tweak, alphabet);
       encrypted = cipher.encrypt(encryptable);
     } else {
-      const cipher = new FF1(key, Buffer.alloc(0), alphabet);
+      const cipher = new FF1(key, tweak, alphabet);
       encrypted = cipher.encrypt(encryptable);
     }
 
@@ -240,7 +272,7 @@ class Cyphera {
   // Used by access(value) (which strips the header itself) and by the
   // access(value, name) escape hatch (where the caller asserts the input
   // has no header).
-  _accessFpe(protectedValue, configuration) {
+  _accessFpe(protectedValue, name, configuration) {
     if (!["ff1", "ff3", "ff31"].includes(configuration.engine)) {
       throw new Error(`unknown engine: ${configuration.engine}`);
     }
@@ -251,17 +283,19 @@ class Cyphera {
     // 1. Strip passthroughs
     const { encryptable, positions, chars } = this._extractPassthroughs(protectedValue, alphabet);
 
+    const tweak = this._resolveTweak(name, configuration);
+
     // 2. Decrypt
     let decrypted;
     if (configuration.engine === "ff3") {
       warnFF3Deprecated();
-      const cipher = new FF3(key, Buffer.alloc(8), alphabet);
+      const cipher = new FF3(key, tweak, alphabet);
       decrypted = cipher.decrypt(encryptable);
     } else if (configuration.engine === "ff31") {
-      const cipher = new FF31(key, Buffer.alloc(7), alphabet);
+      const cipher = new FF31(key, tweak, alphabet);
       decrypted = cipher.decrypt(encryptable);
     } else {
-      const cipher = new FF1(key, Buffer.alloc(0), alphabet);
+      const cipher = new FF1(key, tweak, alphabet);
       decrypted = cipher.decrypt(encryptable);
     }
 

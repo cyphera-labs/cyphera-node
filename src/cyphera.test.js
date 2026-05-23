@@ -176,4 +176,82 @@ describe("Cyphera SDK", () => {
     assert.strictEqual(p1, p2, "env source should produce identical output to inline material");
     delete process.env.TEST_CYPHERA_KEY2;
   });
+
+  // FF3 / FF3-1 tweak is required at the configuration layer. Missing → hard
+  // error with the canonical spec message. No silent zero-fill (matches NIST
+  // + Bouncy Castle + cyphera-rust).
+  const keyOnly = { "test-key": { material: "2B7E151628AED2A6ABF7158809CF4F3C" } };
+
+  it("protect FF3 without tweak throws canonical message", () => {
+    const c = new Cyphera({
+      configurations: {
+        ff3_d: { engine: "ff3", alphabet: "digits", key_ref: "test-key", header_enabled: false },
+      },
+      keys: keyOnly,
+    });
+    assert.throws(
+      () => c.protect("0123456789", "ff3_d"),
+      (err) => err.message === "configuration 'ff3_d' is missing required 'tweak' (FF3 needs 8 bytes)"
+    );
+  });
+
+  it("protect FF3-1 without tweak throws canonical message", () => {
+    const c = new Cyphera({
+      configurations: {
+        ff31_d: { engine: "ff31", alphabet: "digits", key_ref: "test-key", header_enabled: false },
+      },
+      keys: keyOnly,
+    });
+    assert.throws(
+      () => c.protect("0123456789", "ff31_d"),
+      (err) => err.message === "configuration 'ff31_d' is missing required 'tweak' (FF3-1 needs 7 bytes)"
+    );
+  });
+
+  it("protect FF1 without tweak is fine (NIST allows arbitrary length)", () => {
+    const c = new Cyphera({
+      configurations: {
+        ff1_d: { engine: "ff1", alphabet: "digits", key_ref: "test-key", header_enabled: false },
+      },
+      keys: keyOnly,
+    });
+    const protected_ = c.protect("0123456789", "ff1_d");
+    assert.notStrictEqual(protected_, "0123456789");
+  });
+
+  it("protect FF3 with real tweak roundtrips", () => {
+    const c = new Cyphera({
+      configurations: {
+        ff3_d: {
+          engine: "ff3",
+          alphabet: "digits",
+          key_ref: "test-key",
+          tweak: "D8E7920AFA330A73",
+          header_enabled: false,
+        },
+      },
+      keys: keyOnly,
+    });
+    const protected_ = c.protect("0123456789", "ff3_d");
+    assert.notStrictEqual(protected_, "0123456789");
+    assert.strictEqual(c.access(protected_, "ff3_d"), "0123456789");
+  });
+
+  it("protect FF3-1 with real tweak roundtrips", () => {
+    const c = new Cyphera({
+      configurations: {
+        ff31_d: {
+          engine: "ff31",
+          alphabet: "digits",
+          key_ref: "test-key",
+          tweak: "D8E7920AFA330A",
+          header_enabled: false,
+        },
+      },
+      keys: keyOnly,
+    });
+    const protected_ = c.protect("0123456789", "ff31_d");
+    assert.notStrictEqual(protected_, "0123456789");
+    assert.strictEqual(c.access(protected_, "ff31_d"), "0123456789");
+  });
 });
