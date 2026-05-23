@@ -120,12 +120,12 @@ class Cyphera {
       const header = cfg.header || null;
 
       if (headerEnabled && !header) {
-        throw new Error(`Configuration '${name}' has header_enabled=true but no header specified`);
+        throw new Error("configuration error: header must be specified");
       }
 
       if (headerEnabled && header) {
         if (this._headerIndex[header]) {
-          throw new Error(`Header collision: '${header}' used by both '${this._headerIndex[header]}' and '${name}'`);
+          throw new Error("configuration error: header collision");
         }
         this._headerIndex[header] = name;
       }
@@ -152,7 +152,7 @@ class Cyphera {
       case "ff31": return this._protectFpe(value, configuration);
       case "mask": return this._protectMask(value, configuration);
       case "hash": return this._protectHash(value, configuration);
-      default: throw new Error(`Unknown engine: ${configuration.engine}`);
+      default: throw new Error(`unknown engine: ${configuration.engine}`);
     }
   }
 
@@ -174,6 +174,12 @@ class Cyphera {
     if (configurationName !== undefined) {
       // Escape-hatch form — caller names the configuration explicitly.
       const configuration = this._getConfiguration(configurationName);
+      if (configuration.engine === "mask") {
+        throw new Error(`cannot reverse '${configurationName}' — mask is irreversible`);
+      }
+      if (configuration.engine === "hash") {
+        throw new Error(`cannot reverse '${configurationName}' — hash is irreversible`);
+      }
       return this._accessFpe(value, configuration);
     }
 
@@ -187,7 +193,7 @@ class Cyphera {
       }
     }
 
-    throw new Error("No matching header found");
+    throw new Error("no matching header found");
   }
 
   // ── FPE protect ──
@@ -201,7 +207,7 @@ class Cyphera {
 
     // 2. Check zero encryptable
     if (encryptable.length === 0) {
-      throw new Error("No encryptable characters in input");
+      throw new Error("no encryptable characters in input");
     }
 
     // 3. Encrypt
@@ -236,7 +242,7 @@ class Cyphera {
   // has no header).
   _accessFpe(protectedValue, configuration) {
     if (!["ff1", "ff3", "ff31"].includes(configuration.engine)) {
-      throw new Error(`Cannot reverse '${configuration.engine}' — not reversible`);
+      throw new Error(`unknown engine: ${configuration.engine}`);
     }
 
     const key = this._resolveKey(configuration.keyRef);
@@ -266,7 +272,7 @@ class Cyphera {
   // ── Mask ──
 
   _protectMask(value, configuration) {
-    if (!configuration.pattern) throw new Error("Mask configuration requires 'pattern'");
+    if (!configuration.pattern) throw new Error("mask pattern required");
     const len = value.length;
     const mask = "*";
 
@@ -318,9 +324,9 @@ class Cyphera {
   }
 
   _resolveKey(keyRef) {
-    if (!keyRef) throw new Error("No key_ref in configuration");
+    if (!keyRef) throw new Error("key error: no key_ref in configuration");
     const key = this._keys[keyRef];
-    if (!key) throw new Error(`Unknown key: ${keyRef}`);
+    if (!key) throw new Error(`key error: key '${keyRef}' not found`);
     return key;
   }
 

@@ -65,7 +65,7 @@ describe("Cyphera SDK", () => {
   it("access non-reversible throws", () => {
     const c = new Cyphera(config);
     const masked = c.protect("123-45-6789", "ssn_mask");
-    assert.throws(() => c.access(masked), /No matching header/);
+    assert.throws(() => c.access(masked), /no matching header found/);
   });
 
   it("access with config: unknown configuration throws", () => {
@@ -76,7 +76,7 @@ describe("Cyphera SDK", () => {
   it("access with config: irreversible engine throws", () => {
     const c = new Cyphera(config);
     // Escape hatch rejects irreversible engines (mask/hash).
-    assert.throws(() => c.access("anything", "ssn_mask"), /Cannot reverse/);
+    assert.throws(() => c.access("anything", "ssn_mask"), /mask is irreversible/);
   });
 
   it("header collision throws", () => {
@@ -86,7 +86,7 @@ describe("Cyphera SDK", () => {
         b: { engine: "ff1", key_ref: "k", header: "ABC" },
       },
       keys: { k: { material: "2B7E151628AED2A6ABF7158809CF4F3C" } },
-    }), /Header collision/);
+    }), /configuration error: header collision/);
   });
 
   it("header required when enabled throws", () => {
@@ -95,7 +95,7 @@ describe("Cyphera SDK", () => {
         a: { engine: "ff1", key_ref: "k" },
       },
       keys: { k: { material: "2B7E151628AED2A6ABF7158809CF4F3C" } },
-    }), /no header specified/);
+    }), /configuration error: header must be specified/);
   });
 
   it("unicode passthroughs roundtrip", () => {

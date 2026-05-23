@@ -6,8 +6,8 @@ const ALPHANUMERIC = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 class FF3 {
   constructor(key, tweak, alphabet = ALPHANUMERIC) {
-    if (![16, 24, 32].includes(key.length)) throw new Error("Key must be 16, 24, or 32 bytes");
-    if (tweak.length !== 8) throw new Error("Tweak must be exactly 8 bytes");
+    if (![16, 24, 32].includes(key.length)) throw new Error(`invalid key length: ${key.length} (expected 16, 24, or 32)`);
+    if (tweak.length !== 8) throw new Error(`invalid tweak length: ${tweak.length} (expected 8)`);
     if (alphabet.length < 2) throw new Error("Alphabet must have >= 2 chars");
     // FF3 reverses the key
     this.key = Buffer.from([...key].reverse());
@@ -45,7 +45,16 @@ class FF3 {
     return this._fromDigits(this._ff3Decrypt(digits));
   }
 
-  _toDigits(s) { return [...s].map(c => this.charMap[c]); }
+  _toDigits(s) {
+    const arr = [...s];
+    const out = new Array(arr.length);
+    for (let i = 0; i < arr.length; i++) {
+      const idx = this.charMap[arr[i]];
+      if (idx === undefined) throw new Error(`invalid char '${arr[i]}' at position ${i}`);
+      out[i] = idx;
+    }
+    return out;
+  }
   _fromDigits(d) { return d.map(i => this.alphabet[i]).join(""); }
 
   _aes(block) {
@@ -162,7 +171,7 @@ function expandFF31Tweak(t) {
 class FF31 {
   constructor(key, tweak, alphabet = ALPHANUMERIC) {
     if (tweak.length !== 7) {
-      throw new Error("FF3-1 tweak must be exactly 7 bytes (56 bits)");
+      throw new Error(`invalid tweak length: ${tweak.length} (expected 7)`);
     }
     this._ff3 = new FF3(key, expandFF31Tweak(tweak), alphabet);
   }
